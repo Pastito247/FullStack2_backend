@@ -1,29 +1,28 @@
-# Etapa 1: construir el JAR con Maven
-FROM eclipse-temurin:17-jdk AS build
+# Etapa 1: construir el JAR con Maven (imagen ya trae Maven + JDK 17)
+FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copiar archivos de Maven wrapper (si los tienes)
-COPY mvnw .
-COPY .mvn .mvn
-
-# Copiar pom.xml y descargar dependencias
+# Copiamos el pom primero para aprovechar cache
 COPY pom.xml .
-RUN ./mvnw -q -DskipTests dependency:go-offline || mvn -q -DskipTests dependency:go-offline
 
-# Copiar el código fuente
-COPY src src
+# Descargamos dependencias
+RUN mvn -q -DskipTests dependency:go-offline
 
-# Construir el JAR
-RUN ./mvnw -q -DskipTests clean package || mvn -q -DskipTests clean package
+# Copiamos el código fuente
+COPY src ./src
 
-# Etapa 2: imagen liviana para correr la app
+# Construimos el JAR
+RUN mvn -q -DskipTests clean package
+
+# Etapa 2: imagen liviana solo con JRE
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-# Copiar el JAR construido
+# Copiamos el JAR desde la etapa de build
 COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
+# 👆 Aquí usamos el nombre correcto según tu pom.xml
 
-# Puerto que expone Spring Boot
+# Exponemos el puerto de Spring Boot
 EXPOSE 8080
 
 # Comando de inicio
