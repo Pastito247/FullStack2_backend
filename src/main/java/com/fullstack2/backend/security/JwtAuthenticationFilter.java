@@ -34,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 1) Leer header Authorization
         String authHeader = request.getHeader("Authorization");
 
-        // ❗ SI NO HAY TOKEN → dejar pasar la request normal (no devolvemos "Please login")
+        // ⛔ SI NO HAY TOKEN → NO BLOQUEAMOS, dejamos seguir
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -42,9 +42,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2) Extraer token
         String jwt = authHeader.substring(7);
-        String userEmail = jwtService.extractUsername(jwt); // o extractEmail, según tu implementación
+        String userEmail = jwtService.extractUsername(jwt); // o extractEmail, según tu JwtService
 
-        // 3) Si tenemos usuario y aún no hay auth en el contexto, validamos el token
+        // 3) Si tenemos usuario y aún no hay auth en el contexto, validamos token
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 

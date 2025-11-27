@@ -1,6 +1,5 @@
 package com.fullstack2.backend.security;
 
-import com.fullstack2.backend.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -37,38 +36,40 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // 🔓 Habilitar CORS con la config global que definiste en CorsConfig
+                // CORS global
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
-                // ❌ Desactivar CSRF porque usamos JWT (stateless)
+                // Desactivar CSRF (usamos JWT)
                 .csrf(csrf -> csrf.disable())
 
-                // 🔁 Sesión sin estado (JWT)
+                // Sesión sin estado
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 🔐 Reglas de autorización
+                // Reglas de autorización
                 .authorizeHttpRequests(auth -> auth
 
-                        // Permitir preflight de CORS
+                        // Preflight CORS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // === RUTAS PÚBLICAS ===
+                        // Rutas públicas
                         .requestMatchers(
-                                "/api/v1/auth/**",   // Register + Login
-                                "/api/v1/dnd/**",    // API pública de D&D
+                                "/",                 // raíz
+                                "/error",            // página de error
+                                "/api/v1/auth/**",   // register + login
+                                "/api/v1/dnd/**",    // API pública DnD
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
 
-                        // TODO lo demás requiere JWT
+                        // Todo lo demás requiere JWT
                         .anyRequest().authenticated()
                 )
 
-                // 🔑 Autenticación con UserDetailsService + BCrypt
+                // Autenticación con UserDetailsService + BCrypt
                 .authenticationProvider(authenticationProvider())
 
-                // 🧱 Filtro JWT antes del UsernamePasswordAuthenticationFilter
+                // Filtro JWT antes del UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
