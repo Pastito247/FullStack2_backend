@@ -4,8 +4,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpHeaders;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -21,7 +19,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
 
     public JwtAuthenticationFilter(JwtService jwtService,
-            CustomUserDetailsService userDetailsService) {
+                                   CustomUserDetailsService userDetailsService) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
     }
@@ -30,47 +28,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String path = request.getServletPath();
+        // 1) Leer header Authorization
+        String authHeader = request.getHeader("Authorization");
 
-        // 🔓 Ignorar rutas públicas (no exigimos token aquí)
-        if (path.startsWith("/api/v1/auth/") ||
-                path.startsWith("/api/v1/dnd/") ||
-                path.startsWith("/v3/api-docs") ||
-                path.startsWith("/swagger-ui")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-        // Si no hay header o no empieza en "Bearer ", no autenticamos pero dejamos
-        // pasar
+        // ❗ SI NO HAY TOKEN → dejar pasar la request normal (no devolvemos "Please login")
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        final String jwt = authHeader.substring(7);
-        final String username = jwtService.extractUsername(jwt);
+        // 2) Extraer token
+        String jwt = authHeader.substring(7);
+        String userEmail = jwtService.extractUsername(jwt); // o extractEmail, según tu implementación
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+        // 3) Si tenemos usuario y aún no hay auth en el contexto, validamos el token
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
             if (jwtService.isTokenValid(jwt, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                var authToken = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
-                        userDetails.getAuthorities());
+                        userDetails.getAuthorities()
+                );
                 authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request));
-
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
 
+        // 4) Siempre dejamos continuar la cadena
         filterChain.doFilter(request, response);
     }
 }
