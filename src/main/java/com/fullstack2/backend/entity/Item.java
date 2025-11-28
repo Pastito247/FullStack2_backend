@@ -15,49 +15,49 @@ public class Item {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Nombre del ítem
+    // Nombre del objeto
+    @Column(nullable = false)
     private String name;
 
-    // Fuente: OFFICIAL (DnD5e API) o CUSTOM (creado por el DM)
-    @Enumerated(EnumType.STRING)
-    private ItemSource source;
+    // Categoría general (arma, armadura, equipo, etc.)
+    private String category;
 
-    // Tipo genérico: weapon, armor, gear, etc.
-    private String type;
+    // Clase de armadura, si aplica
+    private Integer armorClass;
 
-    // Categoría de equipo según la API: "Weapon", "Armor", "Adventuring Gear", etc.
-    private String equipmentCategory;
-
-    // Categoría de arma: "Simple", "Martial", etc. (weapon_category)
-    private String weaponCategory;
-
-    // Tipo de arma: "Melee", "Ranged", "Melee or Ranged" (weapon_range)
-    private String weaponRange;
-
-    // Daño en dados: "1d8", "2d6", etc.
+    // Daño (ej: "1d8")
     private String damageDice;
 
-    // Tipo de daño: "Slashing", "Bludgeoning", etc.
+    // Tipo de daño (slashing, piercing, etc.)
     private String damageType;
 
-    // Rango normal (en pies)
-    private Integer rangeNormal;
+    // Alcance (melee / ranged)
+    private String weaponRange;
 
-    // Rango largo (en pies)
+    // Rango normal y largo (para armas a distancia)
+    private Integer rangeNormal;
     private Integer rangeLong;
 
-    // Propiedades: "Finesse, Light, Versatile"
-    @Column(length = 500)
+    // Propiedades en formato texto (ej: "finesse, light")
+    @Column(length = 1000)
     private String properties;
 
-    // Precio base en piezas de oro (convertido desde gp/sp/cp)
-    private Integer basePriceGold;
+    // Precio base en piezas de oro (para calcular conversiones)
+    @Column(nullable = false)
+    @Builder.Default
+    private int basePriceGold = 0;
 
-    // Rareza (por ahora puedes dejarlo null o usar algo custom)
+    // Rareza (común, poco común, etc.) – opcional, por ahora texto libre
     private String rarity;
 
+    // Descripción libre
     @Column(length = 2000)
     private String description;
+
+    // Fuente: OFFICIAL (API DnD) o CUSTOM
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ItemSource source;
 
     // Index oficial en la API DnD5e (ejemplo: "longsword")
     private String dnd5eIndex;
@@ -65,7 +65,7 @@ public class Item {
     // URL de imagen opcional para el front
     private String imageUrl;
 
-    // 🔥 NUEVO: usuario que creó este ítem (normalmente el DM)
+    // Usuario que creó este ítem (normalmente el DM) – puede ser null para OFFICIAL
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id")
     @ToString.Exclude

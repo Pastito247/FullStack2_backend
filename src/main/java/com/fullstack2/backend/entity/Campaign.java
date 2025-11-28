@@ -18,23 +18,33 @@ public class Campaign {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Nombre de la campaña
+    @Column(nullable = false)
     private String name;
 
+    // Descripción corta
     @Column(length = 1000)
     private String description;
 
-    // Código que puedes mostrar al jugador para que se una
-    @Column(unique = true)
+    // Código de invitación para que los players se unan
+    @Column(nullable = false, unique = true)
     private String inviteCode;
 
-    // DM dueño de la campaña
+    // Dungeon Master dueño de la campaña
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "dm_id")
+    @JoinColumn(name = "dm_id", nullable = false)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private User dm;
 
-    // Jugadores que se unieron a la campaña
+    // Tiendas dentro de la campaña
+    @OneToMany(mappedBy = "campaign", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Shop> shops = new ArrayList<>();
+
+    // Players que se han unido a esta campaña
     @ManyToMany
     @JoinTable(
             name = "campaign_players",

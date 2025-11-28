@@ -14,6 +14,14 @@ public class CharacterResponse {
     private Integer level;
     private boolean npc;
 
+    private String imageUrl;
+
+    private int pp;
+    private int gp;
+    private int ep;
+    private int sp;
+    private int cp;
+
     private Long campaignId;
     private String campaignName;
 

@@ -2,18 +2,18 @@ package com.fullstack2.backend.service;
 
 import com.fullstack2.backend.entity.Item;
 import com.fullstack2.backend.entity.ItemSource;
+import com.fullstack2.backend.entity.User;
 import com.fullstack2.backend.repository.ItemRepository;
 import com.fullstack2.backend.repository.UserRepository;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.fullstack2.backend.entity.User;
-
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class ItemService {
@@ -22,7 +22,9 @@ public class ItemService {
     private final Dnd5eClient dnd5eClient;
     private final UserRepository userRepository;
 
-    public ItemService(ItemRepository itemRepository, Dnd5eClient dnd5eClient, UserRepository userRepository) {
+    public ItemService(ItemRepository itemRepository,
+                       Dnd5eClient dnd5eClient,
+                       UserRepository userRepository) {
         this.itemRepository = itemRepository;
         this.dnd5eClient = dnd5eClient;
         this.userRepository = userRepository;
@@ -62,10 +64,11 @@ public class ItemService {
         Item existing = getItemById(id);
 
         existing.setName(updated.getName());
-        existing.setType(updated.getType());
+        existing.setCategory(updated.getCategory());
         existing.setBasePriceGold(updated.getBasePriceGold());
         existing.setDescription(updated.getDescription());
         existing.setRarity(updated.getRarity());
+        existing.setImageUrl(updated.getImageUrl());
 
         return itemRepository.save(existing);
     }
@@ -99,7 +102,7 @@ public class ItemService {
             equipmentCategory = (String) ecMap.get("name");
         }
 
-        // weapon_category: "Martial", "Simple", etc.
+        // weapon_category: "Martial", "Simple", etc. (no lo guardamos directo, pero nos sirve para categoría)
         String weaponCategory = (String) response.get("weapon_category");
 
         // weapon_range: "Melee", "Ranged", "Melee or Ranged"
@@ -117,8 +120,8 @@ public class ItemService {
             if (unit != null) {
                 switch (unit) {
                     case "gp" -> basePriceGold = qty;
-                    case "sp" -> basePriceGold = qty / 10; // 10 sp = 1 gp
-                    case "cp" -> basePriceGold = qty / 100; // 100 cp = 1 gp
+                    case "sp" -> basePriceGold = qty / 10;   // 10 sp = 1 gp
+                    case "cp" -> basePriceGold = qty / 100;  // 100 cp = 1 gp
                     default -> basePriceGold = qty;
                 }
             } else {
@@ -160,45 +163,44 @@ public class ItemService {
         // === Propiedades (lista) ===
         String properties = null;
         Object propsObj = response.get("properties");
-        if (propsObj instanceof java.util.List<?> list) {
+        if (propsObj instanceof List<?> list) {
             properties = list.stream()
                     .filter(e -> e instanceof Map<?, ?>)
                     .map(e -> (Map<?, ?>) e)
                     .map(m -> (String) m.get("name"))
-                    .filter(java.util.Objects::nonNull)
-                    .collect(java.util.stream.Collectors.joining(", "));
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.joining(", "));
         }
 
         // === Index oficial (para re-importar o linkear) ===
         String dnd5eIndex = (String) response.get("index");
 
         // === Imagen ===
-        // La API DnD5e (2014) no entrega imagen directamente.
-        // Podemos dejarla null y luego permitir que el DM la edite desde el front,
-        // o mapear manualmente algunos índices a imágenes propias.
         String imageUrl = null;
         Object imageObj = response.get("image");
         if (imageObj instanceof String imagePath) {
-            // Construimos la URL completa
             imageUrl = "https://www.dnd5eapi.co" + imagePath;
         }
+
+        // === Definir categoría general ===
+        // Si viene equipmentCategory (Weapon, Armor, Gear, etc) la usamos,
+        // si no, tratamos de usar weaponCategory, y si no, null.
+        String category = equipmentCategory != null ? equipmentCategory : weaponCategory;
 
         // === Construir el Item ===
         Item item = Item.builder()
                 .name(name)
                 .source(ItemSource.OFFICIAL)
-                .type(equipmentCategory != null ? equipmentCategory.toLowerCase() : null)
-                .equipmentCategory(equipmentCategory)
-                .weaponCategory(weaponCategory)
+                .category(category)
                 .weaponRange(weaponRange)
                 .damageDice(damageDice)
                 .damageType(damageType)
-                .rangeNormal(rangeNormal)
-                .rangeLong(rangeLong)
+                .rangeNormal(rangeNormal != null ? rangeNormal : 0)
+                .rangeLong(rangeLong != null ? rangeLong : 0)
                 .properties(properties)
-                .basePriceGold(basePriceGold)
-                .rarity(null) // si luego quieres mapear rarezas, lo cambiamos
-                .description(null) // podrías rellenar con algo custom si quieres
+                .basePriceGold(basePriceGold != null ? basePriceGold : 0)
+                .rarity(null)       // si luego quieres mapear rarezas, lo cambiamos
+                .description(null)  // podrías rellenar con algo custom si quieres
                 .dnd5eIndex(dnd5eIndex)
                 .imageUrl(imageUrl)
                 .build();

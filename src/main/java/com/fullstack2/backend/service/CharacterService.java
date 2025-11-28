@@ -1,62 +1,38 @@
 package com.fullstack2.backend.service;
 
 import com.fullstack2.backend.dto.CharacterCreateRequest;
-import com.fullstack2.backend.entity.Campaign;
-import com.fullstack2.backend.entity.CharacterEntity;
-import com.fullstack2.backend.entity.User;
-import com.fullstack2.backend.repository.CampaignRepository;
-import com.fullstack2.backend.repository.CharacterRepository;
-import com.fullstack2.backend.repository.UserRepository;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.fullstack2.backend.dto.CharacterResponse;
+import com.fullstack2.backend.entity.*;
+import com.fullstack2.backend.repository.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class CharacterService {
 
     private final CharacterRepository characterRepository;
     private final CampaignRepository campaignRepository;
     private final UserRepository userRepository;
 
-    public CharacterService(CharacterRepository characterRepository,
-            CampaignRepository campaignRepository,
-            UserRepository userRepository) {
-        this.characterRepository = characterRepository;
-        this.campaignRepository = campaignRepository;
-        this.userRepository = userRepository;
-    }
+    // Crear personaje (solo DM)
+    @Transactional
+    public CharacterResponse createCharacter(CharacterCreateRequest request, String dmUsername) {
 
-    private User getCurrentUser() {
-        String email = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName(); // aquí viene el email desde el JWT
+        Campaign campaign = campaignRepository.findById(request.getCampaignId())
+                .orElseThrow(() -> new RuntimeException("Campaign not found"));
 
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + email));
-    }
-
-    // Crear personaje dentro de una campaña (solo DM de la campaña)
-    public CharacterEntity createCharacter(Long campaignId, CharacterCreateRequest request) {
-        User current = getCurrentUser();
-
-        Campaign campaign = campaignRepository.findById(campaignId)
-                .orElseThrow(() -> new RuntimeException("Campaña no encontrada"));
-
-        if (!campaign.getDm().getId().equals(current.getId())) {
-            throw new RuntimeException("Solo el DM de la campaña puede crear personajes");
+        if (!campaign.getDm().getUsername().equals(dmUsername)) {
+            throw new RuntimeException("Only the DM owner of the campaign can create characters");
         }
 
         User assignedPlayer = null;
-        if (request.getPlayerUsername() != null && !request.getPlayerUsername().isBlank()) {
+        if (request.getPlayerUsername() != null) {
             assignedPlayer = userRepository.findByUsername(request.getPlayerUsername())
-                    .orElseThrow(() -> new RuntimeException("Jugador no encontrado: " + request.getPlayerUsername()));
-
-            // Si el jugador no está aún en la campaña, lo agregamos
-            if (!campaign.getPlayers().contains(assignedPlayer)) {
-                campaign.getPlayers().add(assignedPlayer);
-                campaignRepository.save(campaign);
-            }
+                    .orElseThrow(() -> new RuntimeException("Player not found"));
         }
 
         CharacterEntity character = CharacterEntity.builder()
@@ -65,58 +41,89 @@ public class CharacterService {
                 .race(request.getRace())
                 .level(request.getLevel())
                 .npc(request.isNpc())
+                .imageUrl(request.getImageUrl())
+                .pp(Optional.ofNullable(request.getPp()).orElse(0))
+                .gp(Optional.ofNullable(request.getGp()).orElse(0))
+                .ep(Optional.ofNullable(request.getEp()).orElse(0))
+                .sp(Optional.ofNullable(request.getSp()).orElse(0))
+                .cp(Optional.ofNullable(request.getCp()).orElse(0))
                 .campaign(campaign)
                 .player(assignedPlayer)
                 .build();
 
-        return characterRepository.save(character);
+        CharacterEntity saved = characterRepository.save(character);
+
+        return toDto(saved);
     }
 
-    public List<CharacterEntity> listCharactersByCampaign(Long campaignId) {
-        User current = getCurrentUser();
+    // Player: editar nombre e imagen
+    @Transactional
+    public CharacterResponse editCharacter(Long id, String username, String newName, String newImage) {
+        CharacterEntity character = characterRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Character not found"));
 
-        Campaign campaign = campaignRepository.findById(campaignId)
-                .orElseThrow(() -> new RuntimeException("Campaña no encontrada"));
-
-        boolean isDm = campaign.getDm().getId().equals(current.getId());
-        boolean isPlayerInCampaign = campaign.getPlayers().contains(current);
-
-        if (!isDm && !isPlayerInCampaign) {
-            throw new RuntimeException("No tienes acceso a los personajes de esta campaña");
+        if (character.getPlayer() == null || !character.getPlayer().getUsername().equals(username)) {
+            throw new RuntimeException("You do not own this character");
         }
 
-        return characterRepository.findByCampaign(campaign);
+        if (newName != null && !newName.isBlank()) {
+            character.setName(newName);
+        }
+
+        if (newImage != null && !newImage.isBlank()) {
+            character.setImageUrl(newImage);
+        }
+
+        return toDto(characterRepository.save(character));
     }
 
-    // Asignar personaje a jugador (solo DM de la campaña)
-    public CharacterEntity assignCharacterToPlayer(Long characterId, String playerUsername) {
-        User current = getCurrentUser();
+    // Player ve su personaje
+    public CharacterResponse getMyCharacter(String username) {
+        CharacterEntity character = characterRepository.findByPlayerUsername(username)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("You do not have a character assigned"));
+
+        return toDto(character);
+    }
+
+    // DM asigna un personaje a un player
+    @Transactional
+    public CharacterResponse assignCharacterToPlayer(Long characterId, String targetUsername, String dmUsername) {
 
         CharacterEntity character = characterRepository.findById(characterId)
-                .orElseThrow(() -> new RuntimeException("Personaje no encontrado"));
+                .orElseThrow(() -> new RuntimeException("Character not found"));
 
-        Campaign campaign = character.getCampaign();
-
-        if (!campaign.getDm().getId().equals(current.getId())) {
-            throw new RuntimeException("Solo el DM de la campaña puede asignar personajes");
+        if (!character.getCampaign().getDm().getUsername().equals(dmUsername)) {
+            throw new RuntimeException("Only the DM can assign players to characters");
         }
 
-        User player = userRepository.findByUsername(playerUsername)
-                .orElseThrow(() -> new RuntimeException("Jugador no encontrado: " + playerUsername));
-
-        if (!campaign.getPlayers().contains(player)) {
-            campaign.getPlayers().add(player);
-            campaignRepository.save(campaign);
-        }
+        User player = userRepository.findByUsername(targetUsername)
+                .orElseThrow(() -> new RuntimeException("Player not found"));
 
         character.setPlayer(player);
-        return characterRepository.save(character);
+
+        return toDto(characterRepository.save(character));
     }
 
-    // 🔹 Listar personajes del jugador actualmente autenticado
-    public List<CharacterEntity> getCharactersOfCurrentPlayer() {
-        User current = getCurrentUser();
-        return characterRepository.findByPlayer(current);
+    // Convertir a DTO
+    private CharacterResponse toDto(CharacterEntity c) {
+        return CharacterResponse.builder()
+                .id(c.getId())
+                .name(c.getName())
+                .dndClass(c.getDndClass())
+                .race(c.getRace())
+                .level(c.getLevel())
+                .npc(c.isNpc())
+                .imageUrl(c.getImageUrl())
+                .pp(c.getPp())
+                .gp(c.getGp())
+                .ep(c.getEp())
+                .sp(c.getSp())
+                .cp(c.getCp())
+                .campaignId(c.getCampaign().getId())
+                .campaignName(c.getCampaign().getName())
+                .playerUsername(c.getPlayer() != null ? c.getPlayer().getUsername() : null)
+                .build();
     }
-
 }

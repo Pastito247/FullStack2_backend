@@ -3,6 +3,9 @@ package com.fullstack2.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "characters")
 @Data
@@ -15,19 +18,49 @@ public class CharacterEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Nombre del personaje
+    // Nombre del PJ
+    @Column(nullable = false)
     private String name;
 
-    // Clase: Paladin, Wizard, etc.
+    // Clase y raza de DnD
+    @Column(nullable = false)
     private String dndClass;
 
-    // Raza: Dragonborn, Human, Elf...
+    @Column(nullable = false)
     private String race;
 
+    // Nivel del PJ
+    @Column(nullable = false)
     private Integer level;
 
-    // true = NPC, false = PJ
+    // ¿Es NPC?
+    @Column(nullable = false)
     private boolean npc;
+
+    // Imagen (URL que usará el front)
+    private String imageUrl;
+
+    // Dinero usando economía DnD
+    // pp = platinum pieces, gp = gold pieces, etc.
+    @Column(nullable = false)
+    @Builder.Default
+    private int pp = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int gp = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int ep = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int sp = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int cp = 0;
 
     // Campaña a la que pertenece
     @ManyToOne(fetch = FetchType.LAZY)
@@ -42,4 +75,11 @@ public class CharacterEntity {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private User player;
+
+    // Inventario del personaje
+    @OneToMany(mappedBy = "character", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<CharacterItem> inventory = new ArrayList<>();
 }
