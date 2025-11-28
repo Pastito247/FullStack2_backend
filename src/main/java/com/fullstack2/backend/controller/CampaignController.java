@@ -12,6 +12,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/campaigns")
+@CrossOrigin(origins = {
+                "http://localhost:5173", // front dev
+                "https://TU-FRONT-DEPLOY" // cuando subas el front (Netlify/Vercel/etc) puedes poner la URL real
+})
 public class CampaignController {
 
         private final CampaignService campaignService;
@@ -20,8 +24,7 @@ public class CampaignController {
                 this.campaignService = campaignService;
         }
 
-        // Crear campaña (por ahora cualquier usuario logueado,
-        // luego si quieres lo restringimos a ROLE_DM)
+        // Crear campaña (DM / ADMIN)
         @PreAuthorize("hasRole('DM') or hasRole('ADMIN')")
         @PostMapping
         public ResponseEntity<CampaignResponse> createCampaign(
@@ -58,7 +61,23 @@ public class CampaignController {
                 return ResponseEntity.ok(list);
         }
 
-        // Obtener campaña por id (después podemos controlar visibilidad)
+        // 🔹 NUEVO: campañas donde participo como Player
+        @GetMapping("/joined")
+        public ResponseEntity<List<CampaignResponse>> getJoinedCampaigns() {
+                List<CampaignResponse> list = campaignService.getMyCampaignsAsPlayer().stream()
+                                .map(c -> CampaignResponse.builder()
+                                                .id(c.getId())
+                                                .name(c.getName())
+                                                .description(c.getDescription())
+                                                .inviteCode(c.getInviteCode())
+                                                .dmUsername(c.getDm().getUsername())
+                                                .build())
+                                .toList();
+
+                return ResponseEntity.ok(list);
+        }
+
+        // Obtener campaña por id
         @GetMapping("/{id}")
         public ResponseEntity<CampaignResponse> getById(@PathVariable Long id) {
                 Campaign c = campaignService.getById(id);
@@ -90,7 +109,7 @@ public class CampaignController {
                 return ResponseEntity.ok(response);
         }
 
-        @PreAuthorize("hasRole('ADMIN')")
+        @PreAuthorize("hasRole('DM') or hasRole('ADMIN')")
         @DeleteMapping("/{id}")
         public ResponseEntity<Void> deleteCampaign(@PathVariable Long id) {
                 campaignService.deleteCampaign(id);

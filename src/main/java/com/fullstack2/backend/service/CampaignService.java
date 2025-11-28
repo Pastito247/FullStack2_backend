@@ -1,14 +1,14 @@
 package com.fullstack2.backend.service;
 
 import com.fullstack2.backend.entity.Campaign;
+import com.fullstack2.backend.entity.Role;
 import com.fullstack2.backend.entity.User;
 import com.fullstack2.backend.repository.CampaignRepository;
 import com.fullstack2.backend.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import com.fullstack2.backend.entity.Role;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -21,7 +21,7 @@ public class CampaignService {
     private final UserRepository userRepository;
 
     public CampaignService(CampaignRepository campaignRepository,
-            UserRepository userRepository) {
+                           UserRepository userRepository) {
         this.campaignRepository = campaignRepository;
         this.userRepository = userRepository;
     }
@@ -57,6 +57,12 @@ public class CampaignService {
     public List<Campaign> getMyCampaignsAsDm() {
         User dm = getCurrentUser();
         return campaignRepository.findByDm(dm);
+    }
+
+    // 🔹 NUEVO: campañas donde participo como Player
+    public List<Campaign> getMyCampaignsAsPlayer() {
+        User current = getCurrentUser();
+        return campaignRepository.findByPlayersContaining(current);
     }
 
     public Campaign getById(Long id) {

@@ -9,7 +9,12 @@ import java.util.Optional;
 
 public interface CampaignRepository extends JpaRepository<Campaign, Long> {
 
+    // Campañas donde soy Dungeon Master
     List<Campaign> findByDm(User dm);
 
+    // Buscar por código de invitación
     Optional<Campaign> findByInviteCode(String inviteCode);
+
+    // Campañas donde participo como Player (la lista "players" contiene al usuario)
+    List<Campaign> findByPlayersContaining(User player);
 }
