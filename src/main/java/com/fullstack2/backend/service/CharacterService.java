@@ -1,12 +1,20 @@
 package com.fullstack2.backend.service;
 
 import com.fullstack2.backend.dto.CharacterCreateRequest;
+import com.fullstack2.backend.dto.CharacterInventoryItemResponse;
 import com.fullstack2.backend.dto.CharacterResponse;
-import com.fullstack2.backend.entity.*;
-import com.fullstack2.backend.repository.*;
+import com.fullstack2.backend.entity.Campaign;
+import com.fullstack2.backend.entity.CharacterEntity;
+import com.fullstack2.backend.entity.User;
+import com.fullstack2.backend.repository.CampaignRepository;
+import com.fullstack2.backend.repository.CharacterRepository;
+import com.fullstack2.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -18,21 +26,27 @@ public class CharacterService {
     private final CampaignRepository campaignRepository;
     private final UserRepository userRepository;
 
+    // ==========================
     // Crear personaje (solo DM)
+    // ==========================
     @Transactional
-    public CharacterResponse createCharacter(CharacterCreateRequest request, String dmUsername) {
+    public CharacterResponse createCharacter(CharacterCreateRequest request) {
+
+        User current = getCurrentUser();
 
         Campaign campaign = campaignRepository.findById(request.getCampaignId())
-                .orElseThrow(() -> new RuntimeException("Campaign not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaña no encontrada"));
 
-        if (!campaign.getDm().getUsername().equals(dmUsername)) {
-            throw new RuntimeException("Only the DM owner of the campaign can create characters");
+        // Validar que el usuario actual sea el DM dueño de la campaña
+        if (!campaign.getDm().getId().equals(current.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Solo el DM dueño de la campaña puede crear personajes");
         }
 
         User assignedPlayer = null;
-        if (request.getPlayerUsername() != null) {
+        if (request.getPlayerUsername() != null && !request.getPlayerUsername().isBlank()) {
             assignedPlayer = userRepository.findByUsername(request.getPlayerUsername())
-                    .orElseThrow(() -> new RuntimeException("Player not found"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jugador no encontrado"));
         }
 
         CharacterEntity character = CharacterEntity.builder()
@@ -52,18 +66,21 @@ public class CharacterService {
                 .build();
 
         CharacterEntity saved = characterRepository.save(character);
-
         return toDto(saved);
     }
 
-    // Player: editar nombre e imagen
+    // ==========================
+    // Player edita nombre/imagen
+    // ==========================
     @Transactional
-    public CharacterResponse editCharacter(Long id, String username, String newName, String newImage) {
-        CharacterEntity character = characterRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Character not found"));
+    public CharacterResponse editCharacter(Long id, String newName, String newImage) {
+        User current = getCurrentUser();
 
-        if (character.getPlayer() == null || !character.getPlayer().getUsername().equals(username)) {
-            throw new RuntimeException("You do not own this character");
+        CharacterEntity character = characterRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Personaje no encontrado"));
+
+        if (character.getPlayer() == null || !character.getPlayer().getId().equals(current.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Este personaje no te pertenece");
         }
 
         if (newName != null && !newName.isBlank()) {
@@ -77,37 +94,66 @@ public class CharacterService {
         return toDto(characterRepository.save(character));
     }
 
+    // ==========================
     // Player ve su personaje
-    public CharacterResponse getMyCharacter(String username) {
-        CharacterEntity character = characterRepository.findByPlayerUsername(username)
+    // ==========================
+    @Transactional(readOnly = true)
+    public CharacterResponse getMyCharacter() {
+        User current = getCurrentUser();
+
+        CharacterEntity character = characterRepository.findByPlayer(current)
                 .stream()
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("You do not have a character assigned"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "No tienes ningún personaje asignado"));
 
         return toDto(character);
     }
 
-    // DM asigna un personaje a un player
+    // ==========================
+    // DM asigna PJ a player
+    // ==========================
     @Transactional
-    public CharacterResponse assignCharacterToPlayer(Long characterId, String targetUsername, String dmUsername) {
+    public CharacterResponse assignCharacterToPlayer(Long characterId, String targetUsername) {
+
+        User current = getCurrentUser();
 
         CharacterEntity character = characterRepository.findById(characterId)
-                .orElseThrow(() -> new RuntimeException("Character not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Personaje no encontrado"));
 
-        if (!character.getCampaign().getDm().getUsername().equals(dmUsername)) {
-            throw new RuntimeException("Only the DM can assign players to characters");
+        Campaign campaign = character.getCampaign();
+
+        if (!campaign.getDm().getId().equals(current.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Solo el DM dueño de la campaña puede asignar jugadores");
         }
 
         User player = userRepository.findByUsername(targetUsername)
-                .orElseThrow(() -> new RuntimeException("Player not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jugador no encontrado"));
 
         character.setPlayer(player);
 
         return toDto(characterRepository.save(character));
     }
 
-    // Convertir a DTO
+    // ==========================
+    // Helpers
+    // ==========================
     private CharacterResponse toDto(CharacterEntity c) {
+
+        // Mapear inventario del personaje a DTOs simples
+        var inventoryDtos = c.getInventory().stream()
+                .map(ci -> CharacterInventoryItemResponse.builder()
+                        .itemId(ci.getItem().getId())
+                        .name(ci.getItem().getName())
+                        .quantity(ci.getQuantity())
+                        .category(ci.getItem().getCategory())
+                        .damageDice(ci.getItem().getDamageDice())
+                        .damageType(ci.getItem().getDamageType())
+                        .basePriceGold(ci.getItem().getBasePriceGold())
+                        .build())
+                .toList();
+
         return CharacterResponse.builder()
                 .id(c.getId())
                 .name(c.getName())
@@ -124,6 +170,13 @@ public class CharacterService {
                 .campaignId(c.getCampaign().getId())
                 .campaignName(c.getCampaign().getName())
                 .playerUsername(c.getPlayer() != null ? c.getPlayer().getUsername() : null)
+                .inventory(inventoryDtos)
                 .build();
+    }
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
     }
 }

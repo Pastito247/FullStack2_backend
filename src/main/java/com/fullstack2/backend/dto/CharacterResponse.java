@@ -3,6 +3,8 @@ package com.fullstack2.backend.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class CharacterResponse {
@@ -25,5 +27,8 @@ public class CharacterResponse {
     private Long campaignId;
     private String campaignName;
 
-    private String playerUsername; // null si no tiene jugador asignado
+    private String playerUsername;
+
+    // 🔥 Nuevo: inventario del personaje
+    private List<CharacterInventoryItemResponse> inventory;
 }

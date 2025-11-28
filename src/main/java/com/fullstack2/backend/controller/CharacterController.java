@@ -14,35 +14,34 @@ public class CharacterController {
 
     private final CharacterService characterService;
 
-    // Crear personaje (solo DM)
-    @PostMapping("/create")
-    public ResponseEntity<CharacterResponse> create(@RequestBody CharacterCreateRequest request,
-                                                    @RequestHeader("username") String dmUsername) {
-        return ResponseEntity.ok(characterService.createCharacter(request, dmUsername));
+    // Crear personaje en una campaña (solo DM, según el token)
+    @PostMapping("/campaign/{campaignId}")
+    public ResponseEntity<CharacterResponse> create(@PathVariable Long campaignId,
+                                                    @RequestBody CharacterCreateRequest request) {
+        request.setCampaignId(campaignId);
+        return ResponseEntity.ok(characterService.createCharacter(request));
     }
 
-    // Player edita nombre e imagen
+    // Player edita nombre e imagen (según el token)
     @PutMapping("/{id}/edit")
     public ResponseEntity<CharacterResponse> edit(@PathVariable Long id,
-                                                  @RequestHeader("username") String username,
                                                   @RequestParam(required = false) String name,
                                                   @RequestParam(required = false) String imageUrl) {
 
-        return ResponseEntity.ok(characterService.editCharacter(id, username, name, imageUrl));
+        return ResponseEntity.ok(characterService.editCharacter(id, name, imageUrl));
     }
 
-    // Player ve su personaje
+    // Player ve su personaje (según el token)
     @GetMapping("/me")
-    public ResponseEntity<CharacterResponse> myCharacter(@RequestHeader("username") String username) {
-        return ResponseEntity.ok(characterService.getMyCharacter(username));
+    public ResponseEntity<CharacterResponse> myCharacter() {
+        return ResponseEntity.ok(characterService.getMyCharacter());
     }
 
-    // DM asigna personaje a player
+    // DM asigna personaje a player (según el token)
     @PutMapping("/{id}/assign")
     public ResponseEntity<CharacterResponse> assign(@PathVariable Long id,
-                                                    @RequestHeader("username") String dmUsername,
                                                     @RequestParam String targetUsername) {
 
-        return ResponseEntity.ok(characterService.assignCharacterToPlayer(id, targetUsername, dmUsername));
+        return ResponseEntity.ok(characterService.assignCharacterToPlayer(id, targetUsername));
     }
 }
