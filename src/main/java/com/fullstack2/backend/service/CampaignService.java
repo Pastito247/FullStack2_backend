@@ -21,7 +21,7 @@ public class CampaignService {
     private final UserRepository userRepository;
 
     public CampaignService(CampaignRepository campaignRepository,
-                           UserRepository userRepository) {
+            UserRepository userRepository) {
         this.campaignRepository = campaignRepository;
         this.userRepository = userRepository;
     }
@@ -41,12 +41,13 @@ public class CampaignService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
     }
 
-    public Campaign createCampaign(String name, String description) {
+    public Campaign createCampaign(String name, String description, String imageUrl) {
         User dm = getCurrentUser();
 
         Campaign campaign = Campaign.builder()
                 .name(name)
                 .description(description)
+                .imageUrl(imageUrl) // 🔥 nueva
                 .dm(dm)
                 .inviteCode(generateInviteCode())
                 .build();

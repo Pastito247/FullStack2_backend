@@ -25,7 +25,11 @@ public class Campaign {
     // Descripción corta
     @Column(length = 1000)
     private String description;
-
+    
+    // Imagen de portada (URL o data URL para mostrar en el front)
+    @Column(length = 2048)
+    private String imageUrl;
+    
     // Código de invitación para que los players se unan
     @Column(nullable = false, unique = true)
     private String inviteCode;
@@ -46,11 +50,7 @@ public class Campaign {
 
     // Players que se han unido a esta campaña
     @ManyToMany
-    @JoinTable(
-            name = "campaign_players",
-            joinColumns = @JoinColumn(name = "campaign_id"),
-            inverseJoinColumns = @JoinColumn(name = "player_id")
-    )
+    @JoinTable(name = "campaign_players", joinColumns = @JoinColumn(name = "campaign_id"), inverseJoinColumns = @JoinColumn(name = "player_id"))
     @Builder.Default
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
