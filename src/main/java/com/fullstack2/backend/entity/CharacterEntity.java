@@ -37,7 +37,7 @@ public class CharacterEntity {
     @Column(nullable = false)
     private boolean npc;
 
-    // Imagen (URL que usará el front)
+    @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
     // Dinero usando economía DnD
