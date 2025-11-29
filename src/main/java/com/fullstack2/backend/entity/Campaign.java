@@ -25,11 +25,12 @@ public class Campaign {
     // Descripción corta
     @Column(length = 1000)
     private String description;
-    
+
     // Imagen de portada (URL o data URL para mostrar en el front)
-    @Column(length = 2048)
+    @Lob
+    @Column(name = "image_url")
     private String imageUrl;
-    
+
     // Código de invitación para que los players se unan
     @Column(nullable = false, unique = true)
     private String inviteCode;
