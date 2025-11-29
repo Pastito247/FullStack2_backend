@@ -1,8 +1,6 @@
 package com.fullstack2.backend.controller;
 
-import com.fullstack2.backend.dto.CharacterCreateRequest;
-import com.fullstack2.backend.dto.CharacterEditRequest;
-import com.fullstack2.backend.dto.CharacterResponse;
+import com.fullstack2.backend.dto.*;
 import com.fullstack2.backend.service.CharacterService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,9 +17,12 @@ public class CharacterController {
 
     private final CharacterService characterService;
 
-    // Crear personaje en una campaña (solo DM)
+    // ==================================
+    // Crear personaje en una campaña
+    // (solo DM / ADMIN, según el token)
+    // ==================================
     @PostMapping("/campaign/{campaignId}")
-    @PreAuthorize("hasRole('DM')")
+    @PreAuthorize("hasAnyRole('DM','ADMIN')")
     public ResponseEntity<CharacterResponse> create(
             @PathVariable Long campaignId,
             @RequestBody CharacterCreateRequest request
@@ -31,50 +32,108 @@ public class CharacterController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 🔹 NUEVO: obtener personaje por ID (DM o Player)
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('DM','PLAYER')")
-    public ResponseEntity<CharacterResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(characterService.getById(id));
-    }
-
-    // Player edita nombre e imagen (según el token)
+    // ==================================
+    // Player edita NOMBRE e IMAGEN
+    // (usa CharacterEditRequest como JSON)
+    // ==================================
     @PutMapping("/{id}/edit")
     @PreAuthorize("hasRole('PLAYER')")
     public ResponseEntity<CharacterResponse> edit(
             @PathVariable Long id,
             @RequestBody CharacterEditRequest request
     ) {
-        return ResponseEntity.ok(
-                characterService.editCharacter(
-                        id,
-                        request.getName(),
-                        request.getImageUrl()
-                )
-        );
+        CharacterResponse response = characterService.editCharacter(id, request);
+        return ResponseEntity.ok(response);
     }
 
+    // ==================================
     // Listar personajes de una campaña
+    // (DM o Player, de momento abierto)
+    // ==================================
     @GetMapping("/campaign/{campaignId}")
-    @PreAuthorize("hasAnyRole('DM','PLAYER')")
+    @PreAuthorize("hasAnyRole('DM','PLAYER','ADMIN')")
     public ResponseEntity<List<CharacterResponse>> getByCampaign(@PathVariable Long campaignId) {
         return ResponseEntity.ok(characterService.getCharactersByCampaign(campaignId));
     }
 
-    // Player ve su personaje (según el token)
+    // ==================================
+    // Player ve su personaje (MiPersonaje)
+    // ==================================
     @GetMapping("/me")
     @PreAuthorize("hasRole('PLAYER')")
     public ResponseEntity<CharacterResponse> myCharacter() {
         return ResponseEntity.ok(characterService.getMyCharacter());
     }
 
-    // DM asigna personaje a player
+    // ==================================
+    // Obtener personaje por ID (DetallePersonaje)
+    // ==================================
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('DM','PLAYER','ADMIN')")
+    public ResponseEntity<CharacterResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(characterService.getById(id));
+    }
+
+    // ==================================
+    // DM / ADMIN actualiza dinero del PJ
+    // (DetallePersonaje, botón "Editar dinero")
+    // ==================================
+    @PutMapping("/{id}/admin-update")
+    @PreAuthorize("hasAnyRole('DM','ADMIN')")
+    public ResponseEntity<CharacterResponse> updateByDm(
+            @PathVariable Long id,
+            @RequestBody CharacterAdminUpdateRequest request
+    ) {
+        CharacterResponse response = characterService.updateByDm(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================================
+    // DM / ADMIN asigna PJ a player
+    // (DetallePersonaje, form "Asignar a jugador")
+    // ==================================
     @PutMapping("/{id}/assign")
-    @PreAuthorize("hasRole('DM')")
+    @PreAuthorize("hasAnyRole('DM','ADMIN')")
     public ResponseEntity<CharacterResponse> assign(
             @PathVariable Long id,
             @RequestParam String targetUsername
     ) {
-        return ResponseEntity.ok(characterService.assignCharacterToPlayer(id, targetUsername));
+        CharacterResponse response = characterService.assignCharacterToPlayer(id, targetUsername);
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================================
+    // DM / ADMIN agrega item al inventario
+    // (para cuando implementemos esa UI)
+    // ==================================
+    @PostMapping("/{id}/inventory")
+    @PreAuthorize("hasAnyRole('DM','ADMIN')")
+    public ResponseEntity<CharacterResponse> addItemToInventory(
+            @PathVariable Long id,
+            @RequestBody CharacterInventoryUpdateRequest request
+    ) {
+        CharacterResponse response = characterService.addItemToInventory(
+                id,
+                request.getItemId(),
+                request.getQuantity()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================================
+    // DM / ADMIN quita item del inventario
+    // ==================================
+    @DeleteMapping("/{id}/inventory")
+    @PreAuthorize("hasAnyRole('DM','ADMIN')")
+    public ResponseEntity<CharacterResponse> removeItemFromInventory(
+            @PathVariable Long id,
+            @RequestBody CharacterInventoryUpdateRequest request
+    ) {
+        CharacterResponse response = characterService.removeItemFromInventory(
+                id,
+                request.getItemId(),
+                request.getQuantity()
+        );
+        return ResponseEntity.ok(response);
     }
 }
