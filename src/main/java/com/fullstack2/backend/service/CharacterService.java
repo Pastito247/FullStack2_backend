@@ -203,4 +203,17 @@ public class CharacterService {
                                 .map(this::toDto)
                                 .toList();
         }
+
+        // ==========================
+        // Obtener personaje por ID 
+        // ==========================
+
+        @Transactional(readOnly = true)
+        public CharacterResponse getById(Long id) {
+                CharacterEntity character = characterRepository.findById(id)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
+
+                return toDto(character);
+        }
 }

@@ -15,4 +15,6 @@ public interface CharacterRepository extends JpaRepository<CharacterEntity, Long
     Optional<CharacterEntity> findByPlayer(User player);
 
     List<CharacterEntity> findByPlayerUsername(String username);
+
+    
 }
