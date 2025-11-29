@@ -26,9 +26,8 @@ public class Campaign {
     @Column(length = 1000)
     private String description;
 
-    // Imagen de portada (URL o data URL para mostrar en el front)
-    @Lob
-    @Column(name = "image_url")
+    // Imagen de portada (data URL base64 o URL externa)
+    @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
     // Código de invitación para que los players se unan
