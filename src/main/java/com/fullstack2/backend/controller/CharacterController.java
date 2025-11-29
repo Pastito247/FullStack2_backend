@@ -13,6 +13,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/characters")
+@CrossOrigin(origins = {
+        "http://localhost:5173",      // front en dev
+        "https://TU-FRONT-DEPLOY"     // reemplaza por la URL real cuando lo subas
+})
 @RequiredArgsConstructor
 public class CharacterController {
 
@@ -41,8 +45,7 @@ public class CharacterController {
         return ResponseEntity.ok(characterService.editCharacter(id, name, imageUrl));
     }
 
-    // Listar personajes de una campaña (DM o Player dentro de la campaña, 
-    // de momento lo dejamos abierto a ambos roles)
+    // Listar personajes de una campaña (DM o Player dentro de la campaña)
     @GetMapping("/campaign/{campaignId}")
     @PreAuthorize("hasAnyRole('DM','PLAYER')")
     public ResponseEntity<List<CharacterResponse>> getByCampaign(@PathVariable Long campaignId) {
