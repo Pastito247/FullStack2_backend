@@ -13,6 +13,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/characters")
 @RequiredArgsConstructor
+@CrossOrigin(origins = {
+        "http://localhost:5173",      // front dev
+        "https://TU-FRONT-DEPLOY"     // cuando subas el front pon la URL real (Netlify/Vercel/etc)
+})
 public class CharacterController {
 
     private final CharacterService characterService;
