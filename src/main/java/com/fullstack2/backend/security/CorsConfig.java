@@ -15,24 +15,16 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // 🔹 Orígenes permitidos (ajusta el dominio del frontend en Render)
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://fullstack2-frontend.onrender.com"
+                "https://fullstack2-frontend.onrender.com" // cambia esto si tu front tiene otro dominio
         ));
 
-        // 🔹 Métodos permitidos (incluye OPTIONS para el preflight)
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
-        // 🔹 Headers permitidos
-        config.setAllowedHeaders(List.of("*"));
-
-        // 🔹 Permitir cookies / Authorization header
+        config.setAllowedHeaders(List.of("*")); 
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
-        // 👈 MUY IMPORTANTE: que cubra TODO /api/**
         source.registerCorsConfiguration("/api/**", config);
 
         return source;
