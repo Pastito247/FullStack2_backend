@@ -5,7 +5,6 @@ import com.fullstack2.backend.entity.ItemSource;
 import com.fullstack2.backend.entity.User;
 import com.fullstack2.backend.repository.ItemRepository;
 import com.fullstack2.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -17,31 +16,38 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ItemService {
 
     private final ItemRepository itemRepository;
     private final Dnd5eClient dnd5eClient;
     private final UserRepository userRepository;
 
-    // ==========================
-    // CRUD ÍTEMS LOCALES
-    // ==========================
+    public ItemService(ItemRepository itemRepository,
+                       Dnd5eClient dnd5eClient,
+                       UserRepository userRepository) {
+        this.itemRepository = itemRepository;
+        this.dnd5eClient = dnd5eClient;
+        this.userRepository = userRepository;
+    }
 
+    // Listar todos los items
     public List<Item> getAllItems() {
         return itemRepository.findAll();
     }
 
+    // Obtener item por ID
     public Item getItemById(Long id) {
         return itemRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
     }
 
+    // Crear item CUSTOM (propio del DM)
     public Item createCustomItem(Item item) {
-        item.setId(null);
+        item.setId(null); // por si viene con algo
         item.setSource(ItemSource.CUSTOM);
-        item.setDnd5eIndex(null);
+        item.setDnd5eIndex(null); // no viene de la API oficial
 
+        // usuario logueado
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         User creator = userRepository.findByEmail(email)
@@ -52,6 +58,7 @@ public class ItemService {
         return itemRepository.save(item);
     }
 
+    // Actualizar item (campos básicos)
     public Item updateItem(Long id, Item updated) {
         Item existing = getItemById(id);
 
@@ -61,16 +68,11 @@ public class ItemService {
         existing.setDescription(updated.getDescription());
         existing.setRarity(updated.getRarity());
         existing.setImageUrl(updated.getImageUrl());
-        existing.setWeaponRange(updated.getWeaponRange());
-        existing.setDamageDice(updated.getDamageDice());
-        existing.setDamageType(updated.getDamageType());
-        existing.setRangeNormal(updated.getRangeNormal());
-        existing.setRangeLong(updated.getRangeLong());
-        existing.setProperties(updated.getProperties());
 
         return itemRepository.save(existing);
     }
 
+    // Eliminar item
     public void deleteItem(Long id) {
         Item existing = getItemById(id);
         itemRepository.delete(existing);
@@ -104,13 +106,14 @@ public class ItemService {
         if (costObj instanceof Map<?, ?> costMap) {
             Number qtyNum = (Number) costMap.get("quantity");
             String unit = (String) costMap.get("unit");
+
             int qty = qtyNum != null ? qtyNum.intValue() : 0;
 
             if (unit != null) {
                 switch (unit) {
                     case "gp" -> basePriceGold = qty;
-                    case "sp" -> basePriceGold = qty / 10;
-                    case "cp" -> basePriceGold = qty / 100;
+                    case "sp" -> basePriceGold = qty / 10;   // 10 sp = 1 gp
+                    case "cp" -> basePriceGold = qty / 100;  // 100 cp = 1 gp
                     default -> basePriceGold = qty;
                 }
             } else {
@@ -139,8 +142,12 @@ public class ItemService {
             Number normalNum = (Number) rangeMap.get("normal");
             Number longNum = (Number) rangeMap.get("long");
 
-            if (normalNum != null) rangeNormal = normalNum.intValue();
-            if (longNum != null) rangeLong = longNum.intValue();
+            if (normalNum != null) {
+                rangeNormal = normalNum.intValue();
+            }
+            if (longNum != null) {
+                rangeLong = longNum.intValue();
+            }
         }
 
         String properties = null;
@@ -185,7 +192,7 @@ public class ItemService {
     }
 
     // ==========================
-    // IMPORTAR MAGIC ITEM OFICIAL
+    // IMPORTAR MAGIC ITEMS
     // ==========================
 
     @SuppressWarnings("unchecked")
@@ -193,39 +200,57 @@ public class ItemService {
         Map<String, Object> response = dnd5eClient.getMagicItemByIndex(index);
 
         if (response == null || response.isEmpty()) {
-            throw new RuntimeException("No se encontró el magic item con index: " + index);
+            throw new RuntimeException("No se encontró el ítem mágico con index: " + index);
         }
 
         String name = (String) response.get("name");
 
-        // Intentar leer categoría (a veces viene como objeto, a veces como string)
-        String category = null;
-        Object catObj = response.get("equipment_category");
-        if (catObj instanceof Map<?, ?> catMap) {
-            category = (String) catMap.get("name");
-        } else if (catObj instanceof String s) {
-            category = s;
-        }
-
-        // Rarity
+        // rarity: { "name": "Rare", ... }
         String rarity = null;
         Object rarityObj = response.get("rarity");
         if (rarityObj instanceof Map<?, ?> rMap) {
             rarity = (String) rMap.get("name");
-        } else if (rarityObj instanceof String s) {
-            rarity = s;
         }
 
-        // Descripción: suele venir como lista de strings en "desc"
+        // equipment_category: { "name": "Wondrous Item", ... } (si existe)
+        String equipmentCategory = null;
+        Object equipmentCategoryObj = response.get("equipment_category");
+        if (equipmentCategoryObj instanceof Map<?, ?> ecMap) {
+            equipmentCategory = (String) ecMap.get("name");
+        }
+
+        // fallback si no trae equipment_category
+        String category = equipmentCategory != null ? equipmentCategory : "Magic Item";
+
+        // cost (si lo trae; muchos ítems mágicos no tienen)
+        Integer basePriceGold = null;
+        Object costObj = response.get("cost");
+        if (costObj instanceof Map<?, ?> costMap) {
+            Number qtyNum = (Number) costMap.get("quantity");
+            String unit = (String) costMap.get("unit");
+
+            int qty = qtyNum != null ? qtyNum.intValue() : 0;
+
+            if (unit != null) {
+                switch (unit) {
+                    case "gp" -> basePriceGold = qty;
+                    case "sp" -> basePriceGold = qty / 10;
+                    case "cp" -> basePriceGold = qty / 100;
+                    default -> basePriceGold = qty;
+                }
+            } else {
+                basePriceGold = qty;
+            }
+        }
+
+        // desc: lista de strings → un texto largo
         String description = null;
         Object descObj = response.get("desc");
         if (descObj instanceof List<?> list) {
-            description = ((List<?>) list).stream()
+            description = list.stream()
                     .filter(String.class::isInstance)
                     .map(String.class::cast)
                     .collect(Collectors.joining("\n"));
-        } else if (descObj instanceof String s) {
-            description = s;
         }
 
         String dnd5eIndex = (String) response.get("index");
@@ -238,15 +263,9 @@ public class ItemService {
 
         Item item = Item.builder()
                 .name(name)
-                .source(ItemSource.OFFICIAL)
+                .source(ItemSource.OFFICIAL) // o un ItemSource.MAGIC si lo agregas
                 .category(category)
-                .weaponRange(null)
-                .damageDice(null)
-                .damageType(null)
-                .rangeNormal(0)
-                .rangeLong(0)
-                .properties(null)
-                .basePriceGold(0) // la API de magic-items normalmente no trae coste
+                .basePriceGold(basePriceGold != null ? basePriceGold : 0)
                 .rarity(rarity)
                 .description(description)
                 .dnd5eIndex(dnd5eIndex)
