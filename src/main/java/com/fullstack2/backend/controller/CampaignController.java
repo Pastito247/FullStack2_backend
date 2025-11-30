@@ -3,6 +3,8 @@ package com.fullstack2.backend.controller;
 import com.fullstack2.backend.dto.CampaignCreateRequest;
 import com.fullstack2.backend.dto.CampaignPlayerResponse;
 import com.fullstack2.backend.dto.CampaignResponse;
+import com.fullstack2.backend.dto.CampaignUpdateRequest;
+import com.fullstack2.backend.dto.PlayerSummaryResponse;
 import com.fullstack2.backend.entity.Campaign;
 import com.fullstack2.backend.service.CampaignService;
 import org.springframework.http.HttpStatus;
@@ -125,9 +127,30 @@ public class CampaignController {
                 return ResponseEntity.noContent().build();
         }
 
+        // Jugadores unidos a una campaña
         @GetMapping("/{id}/players")
-        @PreAuthorize("hasAnyRole('DM','ADMIN','PLAYER')")
-        public ResponseEntity<List<CampaignPlayerResponse>> getPlayers(@PathVariable Long id) {
+        @PreAuthorize("hasAnyRole('DM','ADMIN')")
+        public ResponseEntity<List<PlayerSummaryResponse>> getPlayersOfCampaign(@PathVariable Long id) {
                 return ResponseEntity.ok(campaignService.getPlayersOfCampaign(id));
+        }
+
+        // Actualizar campaña (nombre/desc/imagen)
+        @PutMapping("/{id}")
+        @PreAuthorize("hasAnyRole('DM','ADMIN')")
+        public ResponseEntity<CampaignResponse> updateCampaign(
+                        @PathVariable Long id,
+                        @RequestBody CampaignUpdateRequest request) {
+                Campaign updated = campaignService.updateCampaign(id, request);
+
+                CampaignResponse resp = CampaignResponse.builder()
+                                .id(updated.getId())
+                                .name(updated.getName())
+                                .description(updated.getDescription())
+                                .imageUrl(updated.getImageUrl())
+                                .inviteCode(updated.getInviteCode())
+                                .dmUsername(updated.getDm().getUsername())
+                                .build();
+
+                return ResponseEntity.ok(resp);
         }
 }

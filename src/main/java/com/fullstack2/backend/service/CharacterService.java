@@ -128,7 +128,8 @@ public class CharacterService {
         }
 
         // ==========================
-        // DM asigna PJ a player
+        // DM asigna PJ a player (AJUSTADO para validar que el player esté en la
+        // campaña)
         // ==========================
         @Transactional
         public CharacterResponse assignCharacterToPlayer(Long characterId, String targetUsername) {
@@ -150,11 +151,14 @@ public class CharacterService {
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                                                 "Jugador no encontrado"));
 
-                // 🔥 NUEVO: validar que el jugador esté unido a la campaña
-                if (campaign.getPlayers() == null ||
-                                campaign.getPlayers().stream().noneMatch(u -> u.getId().equals(player.getId()))) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Este jugador no está unido a esta campaña");
+                // 🔥 VALIDAR que el player esté unido a la campaña
+                boolean pertenece = campaign.getPlayers().stream()
+                                .anyMatch(p -> p.getId().equals(player.getId()));
+
+                if (!pertenece) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "El jugador no está unido a esta campaña");
                 }
 
                 character.setPlayer(player);
@@ -382,14 +386,13 @@ public class CharacterService {
         }
 
         // ==========================
-        // Player ve TODOS sus PJs
+        // Player ve TODOS sus personajes
         // ==========================
         @Transactional(readOnly = true)
         public List<CharacterResponse> getMyCharacters() {
                 User current = getCurrentUser();
 
-                return characterRepository.findByPlayer(current)
-                                .stream()
+                return characterRepository.findByPlayer(current).stream()
                                 .map(this::toDto)
                                 .toList();
         }

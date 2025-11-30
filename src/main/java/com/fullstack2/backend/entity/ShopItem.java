@@ -15,15 +15,21 @@ public class ShopItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "shop_id")
+    // Tienda que ofrece el ítem
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shop_id", nullable = false)
     private Shop shop;
 
-    @ManyToOne
-    @JoinColumn(name = "item_id")
+    // Ítem (oficial o custom) que se vende
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", nullable = false)
     private Item item;
 
-    private int stock;
+    // Stock disponible
+    @Column(nullable = false)
+    private Integer stock;
 
-    private int priceOverrideGold;
+    // Si quieres sobrescribir el precio base del ítem en esta tienda
+    @Column(name = "price_override_gold")
+    private Integer priceOverrideGold;
 }

@@ -1,6 +1,8 @@
 package com.fullstack2.backend.service;
 
 import com.fullstack2.backend.dto.CampaignPlayerResponse;
+import com.fullstack2.backend.dto.CampaignUpdateRequest;
+import com.fullstack2.backend.dto.PlayerSummaryResponse;
 import com.fullstack2.backend.entity.Campaign;
 import com.fullstack2.backend.entity.Role;
 import com.fullstack2.backend.entity.User;
@@ -29,18 +31,42 @@ public class CampaignService {
     }
 
     private User getCurrentUser() {
-        String email = SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getName();
-
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + email));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
     }
 
     private String generateInviteCode() {
         byte[] randomBytes = new byte[6];
         new SecureRandom().nextBytes(randomBytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    @Transactional
+    public Campaign updateCampaign(Long id, CampaignUpdateRequest req) {
+        User current = getCurrentUser();
+
+        Campaign campaign = campaignRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaña no encontrada"));
+
+        boolean esDueno = campaign.getDm().getId().equals(current.getId());
+        boolean esAdmin = current.getRole() == Role.ADMIN;
+
+        if (!esDueno && !esAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para editar esta campaña");
+        }
+
+        if (req.getName() != null && !req.getName().isBlank()) {
+            campaign.setName(req.getName());
+        }
+        if (req.getDescription() != null) {
+            campaign.setDescription(req.getDescription());
+        }
+        if (req.getImageUrl() != null) {
+            campaign.setImageUrl(req.getImageUrl());
+        }
+
+        return campaignRepository.save(campaign);
     }
 
     public Campaign createCampaign(String name, String description, String imageUrl) {
@@ -104,17 +130,26 @@ public class CampaignService {
         campaignRepository.delete(campaign);
     }
 
+    // ==========================
+    // Jugadores unidos a una campaña (para el DM)
+    // ==========================
     @Transactional(readOnly = true)
-    public List<CampaignPlayerResponse> getPlayersOfCampaign(Long campaignId) {
+    public List<PlayerSummaryResponse> getPlayersOfCampaign(Long campaignId) {
+        User current = getCurrentUser();
+
         Campaign campaign = campaignRepository.findById(campaignId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaña no encontrada"));
 
-        if (campaign.getPlayers() == null) {
-            return List.of();
+        boolean esDueno = campaign.getDm().getId().equals(current.getId());
+        boolean esAdmin = current.getRole() == Role.ADMIN;
+
+        if (!esDueno && !esAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Solo el DM dueño o un admin pueden ver los jugadores de la campaña");
         }
 
         return campaign.getPlayers().stream()
-                .map(u -> new CampaignPlayerResponse(u.getId(), u.getUsername(), u.getEmail()))
+                .map(u -> new PlayerSummaryResponse(u.getId(), u.getUsername(), u.getEmail()))
                 .toList();
     }
 }

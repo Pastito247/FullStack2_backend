@@ -67,11 +67,9 @@ public class CharacterController {
         return ResponseEntity.ok(characterService.getMyCharacter());
     }
 
-    // ==================================
-    // Obtener personaje por ID (DetallePersonaje)
-    // ==================================
+    // Obtener detalle de un personaje por ID (DM o Player que tenga acceso)
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('DM','PLAYER','ADMIN')")
+    @PreAuthorize("hasAnyRole('DM','PLAYER')")
     public ResponseEntity<CharacterResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(characterService.getById(id));
     }
@@ -133,10 +131,10 @@ public class CharacterController {
         return ResponseEntity.ok(response);
     }
 
-    // Lista de personajes del player (uno por campaña)
-    @GetMapping("/my")
+    // Lista de TODOS los personajes del Player (uno por campaña, idealmente)
+    @GetMapping("/my-characters")
     @PreAuthorize("hasRole('PLAYER')")
-    public ResponseEntity<List<CharacterResponse>> myCharacters() {
+    public ResponseEntity<List<CharacterResponse>> myCharactersList() {
         return ResponseEntity.ok(characterService.getMyCharacters());
     }
 }
