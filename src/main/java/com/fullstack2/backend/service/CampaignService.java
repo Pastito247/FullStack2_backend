@@ -1,5 +1,6 @@
 package com.fullstack2.backend.service;
 
+import com.fullstack2.backend.dto.CampaignPlayerResponse;
 import com.fullstack2.backend.entity.Campaign;
 import com.fullstack2.backend.entity.Role;
 import com.fullstack2.backend.entity.User;
@@ -8,6 +9,7 @@ import com.fullstack2.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
@@ -102,4 +104,17 @@ public class CampaignService {
         campaignRepository.delete(campaign);
     }
 
+    @Transactional(readOnly = true)
+    public List<CampaignPlayerResponse> getPlayersOfCampaign(Long campaignId) {
+        Campaign campaign = campaignRepository.findById(campaignId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaña no encontrada"));
+
+        if (campaign.getPlayers() == null) {
+            return List.of();
+        }
+
+        return campaign.getPlayers().stream()
+                .map(u -> new CampaignPlayerResponse(u.getId(), u.getUsername(), u.getEmail()))
+                .toList();
+    }
 }

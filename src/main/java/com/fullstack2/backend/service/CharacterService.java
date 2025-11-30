@@ -25,374 +25,372 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class CharacterService {
 
-    private final CharacterRepository characterRepository;
-    private final CampaignRepository campaignRepository;
-    private final UserRepository userRepository;
-    private final ItemRepository itemRepository;
-    private final CharacterItemRepository characterItemRepository;
+        private final CharacterRepository characterRepository;
+        private final CampaignRepository campaignRepository;
+        private final UserRepository userRepository;
+        private final ItemRepository itemRepository;
+        private final CharacterItemRepository characterItemRepository;
 
-    // ==========================
-    // Crear personaje (solo DM)
-    // ==========================
-    @Transactional
-    public CharacterResponse createCharacter(CharacterCreateRequest request) {
+        // ==========================
+        // Crear personaje (solo DM)
+        // ==========================
+        @Transactional
+        public CharacterResponse createCharacter(CharacterCreateRequest request) {
 
-        User current = getCurrentUser();
+                User current = getCurrentUser();
 
-        Campaign campaign = campaignRepository.findById(request.getCampaignId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Campaña no encontrada"
-                ));
+                Campaign campaign = campaignRepository.findById(request.getCampaignId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Campaña no encontrada"));
 
-        // Validar que el usuario actual sea el DM dueño de la campaña
-        if (!campaign.getDm().getId().equals(current.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Solo el DM dueño de la campaña puede crear personajes"
-            );
+                // Validar que el usuario actual sea el DM dueño de la campaña
+                if (!campaign.getDm().getId().equals(current.getId())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Solo el DM dueño de la campaña puede crear personajes");
+                }
+
+                User assignedPlayer = null;
+                if (request.getPlayerUsername() != null && !request.getPlayerUsername().isBlank()) {
+                        assignedPlayer = userRepository.findByUsername(request.getPlayerUsername())
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.NOT_FOUND,
+                                                        "Jugador no encontrado"));
+                }
+
+                CharacterEntity character = CharacterEntity.builder()
+                                .name(request.getName())
+                                .dndClass(request.getDndClass())
+                                .race(request.getRace())
+                                .level(request.getLevel())
+                                .npc(request.isNpc())
+                                .imageUrl(request.getImageUrl())
+                                .pp(Optional.ofNullable(request.getPp()).orElse(0))
+                                .gp(Optional.ofNullable(request.getGp()).orElse(0))
+                                .ep(Optional.ofNullable(request.getEp()).orElse(0))
+                                .sp(Optional.ofNullable(request.getSp()).orElse(0))
+                                .cp(Optional.ofNullable(request.getCp()).orElse(0))
+                                .campaign(campaign)
+                                .player(assignedPlayer)
+                                .build();
+
+                CharacterEntity saved = characterRepository.save(character);
+                return toDto(saved);
         }
 
-        User assignedPlayer = null;
-        if (request.getPlayerUsername() != null && !request.getPlayerUsername().isBlank()) {
-            assignedPlayer = userRepository.findByUsername(request.getPlayerUsername())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND,
-                            "Jugador no encontrado"
-                    ));
+        // ==========================
+        // Player edita nombre/imagen
+        // ==========================
+        @Transactional
+        public CharacterResponse editCharacter(Long id, CharacterEditRequest req) {
+                User current = getCurrentUser();
+
+                CharacterEntity character = characterRepository.findById(id)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
+
+                if (character.getPlayer() == null || !character.getPlayer().getId().equals(current.getId())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Este personaje no te pertenece");
+                }
+
+                if (req.getName() != null && !req.getName().isBlank()) {
+                        character.setName(req.getName());
+                }
+
+                if (req.getImageUrl() != null && !req.getImageUrl().isBlank()) {
+                        // Aquí guardamos la cadena tal cual (URL normal o data URL base64)
+                        character.setImageUrl(req.getImageUrl());
+                }
+
+                CharacterEntity saved = characterRepository.save(character);
+                return toDto(saved);
         }
 
-        CharacterEntity character = CharacterEntity.builder()
-                .name(request.getName())
-                .dndClass(request.getDndClass())
-                .race(request.getRace())
-                .level(request.getLevel())
-                .npc(request.isNpc())
-                .imageUrl(request.getImageUrl())
-                .pp(Optional.ofNullable(request.getPp()).orElse(0))
-                .gp(Optional.ofNullable(request.getGp()).orElse(0))
-                .ep(Optional.ofNullable(request.getEp()).orElse(0))
-                .sp(Optional.ofNullable(request.getSp()).orElse(0))
-                .cp(Optional.ofNullable(request.getCp()).orElse(0))
-                .campaign(campaign)
-                .player(assignedPlayer)
-                .build();
+        // ==========================
+        // Player ve su personaje
+        // ==========================
+        @Transactional(readOnly = true)
+        public CharacterResponse getMyCharacter() {
+                User current = getCurrentUser();
 
-        CharacterEntity saved = characterRepository.save(character);
-        return toDto(saved);
-    }
+                CharacterEntity character = characterRepository.findByPlayer(current)
+                                .stream()
+                                .findFirst()
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "No tienes ningún personaje asignado"));
 
-    // ==========================
-    // Player edita nombre/imagen
-    // ==========================
-    @Transactional
-    public CharacterResponse editCharacter(Long id, CharacterEditRequest req) {
-        User current = getCurrentUser();
-
-        CharacterEntity character = characterRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Personaje no encontrado"
-                ));
-
-        if (character.getPlayer() == null || !character.getPlayer().getId().equals(current.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Este personaje no te pertenece"
-            );
+                return toDto(character);
         }
 
-        if (req.getName() != null && !req.getName().isBlank()) {
-            character.setName(req.getName());
+        // ==========================
+        // DM asigna PJ a player
+        // ==========================
+        @Transactional
+        public CharacterResponse assignCharacterToPlayer(Long characterId, String targetUsername) {
+
+                User current = getCurrentUser();
+
+                CharacterEntity character = characterRepository.findById(characterId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
+
+                Campaign campaign = character.getCampaign();
+
+                if (!campaign.getDm().getId().equals(current.getId())) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                        "Solo el DM dueño de la campaña puede asignar jugadores");
+                }
+
+                User player = userRepository.findByUsername(targetUsername)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Jugador no encontrado"));
+
+                // 🔥 NUEVO: validar que el jugador esté unido a la campaña
+                if (campaign.getPlayers() == null ||
+                                campaign.getPlayers().stream().noneMatch(u -> u.getId().equals(player.getId()))) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Este jugador no está unido a esta campaña");
+                }
+
+                character.setPlayer(player);
+
+                return toDto(characterRepository.save(character));
         }
 
-        if (req.getImageUrl() != null && !req.getImageUrl().isBlank()) {
-            // Aquí guardamos la cadena tal cual (URL normal o data URL base64)
-            character.setImageUrl(req.getImageUrl());
+        // ==========================
+        // Personajes de una campaña
+        // ==========================
+        @Transactional(readOnly = true)
+        public List<CharacterResponse> getCharactersByCampaign(Long campaignId) {
+                Campaign campaign = campaignRepository.findById(campaignId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Campaña no encontrada"));
+
+                return characterRepository.findByCampaign(campaign).stream()
+                                .map(this::toDto)
+                                .toList();
         }
 
-        CharacterEntity saved = characterRepository.save(character);
-        return toDto(saved);
-    }
+        // ==========================
+        // Obtener personaje por ID
+        // ==========================
+        @Transactional(readOnly = true)
+        public CharacterResponse getById(Long id) {
+                CharacterEntity character = characterRepository.findById(id)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
 
-    // ==========================
-    // Player ve su personaje
-    // ==========================
-    @Transactional(readOnly = true)
-    public CharacterResponse getMyCharacter() {
-        User current = getCurrentUser();
-
-        CharacterEntity character = characterRepository.findByPlayer(current)
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "No tienes ningún personaje asignado"
-                ));
-
-        return toDto(character);
-    }
-
-    // ==========================
-    // DM asigna PJ a player
-    // ==========================
-    @Transactional
-    public CharacterResponse assignCharacterToPlayer(Long characterId, String targetUsername) {
-
-        User current = getCurrentUser();
-
-        CharacterEntity character = characterRepository.findById(characterId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Personaje no encontrado"
-                ));
-
-        Campaign campaign = character.getCampaign();
-
-        if (!campaign.getDm().getId().equals(current.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Solo el DM dueño de la campaña puede asignar jugadores"
-            );
+                return toDto(character);
         }
 
-        User player = userRepository.findByUsername(targetUsername)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Jugador no encontrado"
-                ));
+        // ==========================
+        // DM actualiza dinero del PJ
+        // ==========================
+        @Transactional
+        public CharacterResponse updateByDm(Long id, CharacterAdminUpdateRequest req) {
+                User current = getCurrentUser();
 
-        character.setPlayer(player);
+                CharacterEntity ch = characterRepository.findById(id)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
 
-        return toDto(characterRepository.save(character));
-    }
+                Campaign campaign = ch.getCampaign();
+                if (campaign == null || !campaign.getDm().getId().equals(current.getId())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Solo el DM dueño de la campaña puede editar el dinero del personaje");
+                }
 
-    // ==========================
-    // Personajes de una campaña
-    // ==========================
-    @Transactional(readOnly = true)
-    public List<CharacterResponse> getCharactersByCampaign(Long campaignId) {
-        Campaign campaign = campaignRepository.findById(campaignId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Campaña no encontrada"
-                ));
+                if (req.getPp() != null)
+                        ch.setPp(req.getPp());
+                if (req.getGp() != null)
+                        ch.setGp(req.getGp());
+                if (req.getEp() != null)
+                        ch.setEp(req.getEp());
+                if (req.getSp() != null)
+                        ch.setSp(req.getSp());
+                if (req.getCp() != null)
+                        ch.setCp(req.getCp());
 
-        return characterRepository.findByCampaign(campaign).stream()
-                .map(this::toDto)
-                .toList();
-    }
-
-    // ==========================
-    // Obtener personaje por ID 
-    // ==========================
-    @Transactional(readOnly = true)
-    public CharacterResponse getById(Long id) {
-        CharacterEntity character = characterRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Personaje no encontrado"
-                ));
-
-        return toDto(character);
-    }
-
-    // ==========================
-    // DM actualiza dinero del PJ
-    // ==========================
-    @Transactional
-    public CharacterResponse updateByDm(Long id, CharacterAdminUpdateRequest req) {
-        User current = getCurrentUser();
-
-        CharacterEntity ch = characterRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Personaje no encontrado"
-                ));
-
-        Campaign campaign = ch.getCampaign();
-        if (campaign == null || !campaign.getDm().getId().equals(current.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Solo el DM dueño de la campaña puede editar el dinero del personaje"
-            );
+                CharacterEntity saved = characterRepository.save(ch);
+                return toDto(saved);
         }
 
-        if (req.getPp() != null) ch.setPp(req.getPp());
-        if (req.getGp() != null) ch.setGp(req.getGp());
-        if (req.getEp() != null) ch.setEp(req.getEp());
-        if (req.getSp() != null) ch.setSp(req.getSp());
-        if (req.getCp() != null) ch.setCp(req.getCp());
+        // ==========================
+        // Inventario: agregar item
+        // ==========================
+        @Transactional
+        public CharacterResponse addItemToInventory(Long characterId, Long itemId, int quantity) {
+                if (quantity <= 0) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "La cantidad debe ser mayor a 0");
+                }
 
-        CharacterEntity saved = characterRepository.save(ch);
-        return toDto(saved);
-    }
+                User current = getCurrentUser();
 
-    // ==========================
-    // Inventario: agregar item
-    // ==========================
-    @Transactional
-    public CharacterResponse addItemToInventory(Long characterId, Long itemId, int quantity) {
-        if (quantity <= 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "La cantidad debe ser mayor a 0"
-            );
+                CharacterEntity character = characterRepository.findById(characterId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
+
+                Campaign campaign = character.getCampaign();
+                if (campaign == null || !campaign.getDm().getId().equals(current.getId())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Solo el DM dueño de la campaña puede modificar el inventario");
+                }
+
+                Item item = itemRepository.findById(itemId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Ítem no encontrado"));
+
+                CharacterItem characterItem = characterItemRepository
+                                .findByCharacterAndItem(character, item)
+                                .orElse(null);
+
+                if (characterItem == null) {
+                        characterItem = CharacterItem.builder()
+                                        .character(character)
+                                        .item(item)
+                                        .quantity(quantity)
+                                        .build();
+                } else {
+                        characterItem.setQuantity(characterItem.getQuantity() + quantity);
+                }
+
+                characterItemRepository.save(characterItem);
+
+                // recargar personaje con inventario actualizado
+                CharacterEntity updated = characterRepository.findById(characterId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.INTERNAL_SERVER_ERROR,
+                                                "Error al recargar personaje"));
+
+                return toDto(updated);
         }
 
-        User current = getCurrentUser();
+        // ==========================
+        // Inventario: quitar item
+        // ==========================
+        @Transactional
+        public CharacterResponse removeItemFromInventory(Long characterId, Long itemId, int quantity) {
+                if (quantity <= 0) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "La cantidad debe ser mayor a 0");
+                }
 
-        CharacterEntity character = characterRepository.findById(characterId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Personaje no encontrado"
-                ));
+                User current = getCurrentUser();
 
-        Campaign campaign = character.getCampaign();
-        if (campaign == null || !campaign.getDm().getId().equals(current.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Solo el DM dueño de la campaña puede modificar el inventario"
-            );
+                CharacterEntity character = characterRepository.findById(characterId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Personaje no encontrado"));
+
+                Campaign campaign = character.getCampaign();
+                if (campaign == null || !campaign.getDm().getId().equals(current.getId())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Solo el DM dueño de la campaña puede modificar el inventario");
+                }
+
+                Item item = itemRepository.findById(itemId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Ítem no encontrado"));
+
+                CharacterItem characterItem = characterItemRepository
+                                .findByCharacterAndItem(character, item)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "El personaje no tiene este ítem en el inventario"));
+
+                int newQty = characterItem.getQuantity() - quantity;
+                if (newQty <= 0) {
+                        characterItemRepository.delete(characterItem);
+                } else {
+                        characterItem.setQuantity(newQty);
+                        characterItemRepository.save(characterItem);
+                }
+
+                CharacterEntity updated = characterRepository.findById(characterId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.INTERNAL_SERVER_ERROR,
+                                                "Error al recargar personaje"));
+
+                return toDto(updated);
         }
 
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Ítem no encontrado"
-                ));
+        // ==========================
+        // Helpers
+        // ==========================
 
-        CharacterItem characterItem = characterItemRepository
-                .findByCharacterAndItem(character, item)
-                .orElse(null);
+        private CharacterResponse toDto(CharacterEntity c) {
 
-        if (characterItem == null) {
-            characterItem = CharacterItem.builder()
-                    .character(character)
-                    .item(item)
-                    .quantity(quantity)
-                    .build();
-        } else {
-            characterItem.setQuantity(characterItem.getQuantity() + quantity);
+                // Mapear inventario del personaje a DTOs simples
+                List<CharacterInventoryItemResponse> inventoryDtos = (c.getInventory() == null
+                                ? List.<CharacterItem>of()
+                                : c.getInventory())
+                                .stream()
+                                .map(ci -> CharacterInventoryItemResponse.builder()
+                                                .itemId(ci.getItem().getId())
+                                                .name(ci.getItem().getName())
+                                                .quantity(ci.getQuantity())
+                                                .category(ci.getItem().getCategory())
+                                                .damageDice(ci.getItem().getDamageDice())
+                                                .damageType(ci.getItem().getDamageType())
+                                                .basePriceGold(ci.getItem().getBasePriceGold())
+                                                .build())
+                                .toList();
+
+                return CharacterResponse.builder()
+                                .id(c.getId())
+                                .name(c.getName())
+                                .dndClass(c.getDndClass())
+                                .race(c.getRace())
+                                .level(c.getLevel())
+                                .npc(c.isNpc())
+                                .imageUrl(c.getImageUrl())
+                                .pp(c.getPp())
+                                .gp(c.getGp())
+                                .ep(c.getEp())
+                                .sp(c.getSp())
+                                .cp(c.getCp())
+                                .campaignId(c.getCampaign() != null ? c.getCampaign().getId() : null)
+                                .campaignName(c.getCampaign() != null ? c.getCampaign().getName() : null)
+                                .playerUsername(c.getPlayer() != null ? c.getPlayer().getUsername() : null)
+                                .inventory(inventoryDtos)
+                                .build();
         }
 
-        characterItemRepository.save(characterItem);
-
-        // recargar personaje con inventario actualizado
-        CharacterEntity updated = characterRepository.findById(characterId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Error al recargar personaje"
-                ));
-
-        return toDto(updated);
-    }
-
-    // ==========================
-    // Inventario: quitar item
-    // ==========================
-    @Transactional
-    public CharacterResponse removeItemFromInventory(Long characterId, Long itemId, int quantity) {
-        if (quantity <= 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "La cantidad debe ser mayor a 0"
-            );
+        private User getCurrentUser() {
+                String email = SecurityContextHolder.getContext().getAuthentication().getName();
+                return userRepository.findByEmail(email)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.UNAUTHORIZED,
+                                                "Usuario no encontrado"));
         }
 
-        User current = getCurrentUser();
+        // ==========================
+        // Player ve TODOS sus PJs
+        // ==========================
+        @Transactional(readOnly = true)
+        public List<CharacterResponse> getMyCharacters() {
+                User current = getCurrentUser();
 
-        CharacterEntity character = characterRepository.findById(characterId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Personaje no encontrado"
-                ));
-
-        Campaign campaign = character.getCampaign();
-        if (campaign == null || !campaign.getDm().getId().equals(current.getId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Solo el DM dueño de la campaña puede modificar el inventario"
-            );
+                return characterRepository.findByPlayer(current)
+                                .stream()
+                                .map(this::toDto)
+                                .toList();
         }
-
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Ítem no encontrado"
-                ));
-
-        CharacterItem characterItem = characterItemRepository
-                .findByCharacterAndItem(character, item)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "El personaje no tiene este ítem en el inventario"
-                ));
-
-        int newQty = characterItem.getQuantity() - quantity;
-        if (newQty <= 0) {
-            characterItemRepository.delete(characterItem);
-        } else {
-            characterItem.setQuantity(newQty);
-            characterItemRepository.save(characterItem);
-        }
-
-        CharacterEntity updated = characterRepository.findById(characterId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Error al recargar personaje"
-                ));
-
-        return toDto(updated);
-    }
-
-    // ==========================
-    // Helpers
-    // ==========================
-
-    private CharacterResponse toDto(CharacterEntity c) {
-
-        // Mapear inventario del personaje a DTOs simples
-        List<CharacterInventoryItemResponse> inventoryDtos =
-                (c.getInventory() == null ? List.<CharacterItem>of() : c.getInventory())
-                        .stream()
-                        .map(ci -> CharacterInventoryItemResponse.builder()
-                                .itemId(ci.getItem().getId())
-                                .name(ci.getItem().getName())
-                                .quantity(ci.getQuantity())
-                                .category(ci.getItem().getCategory())
-                                .damageDice(ci.getItem().getDamageDice())
-                                .damageType(ci.getItem().getDamageType())
-                                .basePriceGold(ci.getItem().getBasePriceGold())
-                                .build())
-                        .toList();
-
-        return CharacterResponse.builder()
-                .id(c.getId())
-                .name(c.getName())
-                .dndClass(c.getDndClass())
-                .race(c.getRace())
-                .level(c.getLevel())
-                .npc(c.isNpc())
-                .imageUrl(c.getImageUrl())
-                .pp(c.getPp())
-                .gp(c.getGp())
-                .ep(c.getEp())
-                .sp(c.getSp())
-                .cp(c.getCp())
-                .campaignId(c.getCampaign() != null ? c.getCampaign().getId() : null)
-                .campaignName(c.getCampaign() != null ? c.getCampaign().getName() : null)
-                .playerUsername(c.getPlayer() != null ? c.getPlayer().getUsername() : null)
-                .inventory(inventoryDtos)
-                .build();
-    }
-
-    private User getCurrentUser() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "Usuario no encontrado"
-                ));
-    }
 }
