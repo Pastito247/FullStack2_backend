@@ -82,4 +82,55 @@ public class CharacterEntity {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<CharacterItem> inventory = new ArrayList<>();
+
+    // ==========================
+    // Helpers de dinero (pp/gp/ep/sp/cp)
+    // ==========================
+
+    /**
+     * Devuelve el total de dinero del personaje expresado en cobre (cp).
+     * 1 pp = 10 gp = 1000 cp
+     * 1 gp = 100 cp
+     * 1 ep = 50 cp
+     * 1 sp = 10 cp
+     */
+    public int getTotalCopper() {
+        int total = 0;
+        total += this.pp * 1000;
+        total += this.gp * 100;
+        total += this.ep * 50;
+        total += this.sp * 10;
+        total += this.cp;
+        return total;
+    }
+
+    /**
+     * Distribuye un monto total en cobre entre pp/gp/ep/sp/cp.
+     * Si llega un número negativo, se normaliza a 0.
+     */
+    public void setFromTotalCopper(int totalCopper) {
+        if (totalCopper < 0) {
+            totalCopper = 0;
+        }
+
+        int pp = totalCopper / 1000;
+        totalCopper %= 1000;
+
+        int gp = totalCopper / 100;
+        totalCopper %= 100;
+
+        int ep = totalCopper / 50;
+        totalCopper %= 50;
+
+        int sp = totalCopper / 10;
+        totalCopper %= 10;
+
+        int cp = totalCopper;
+
+        this.pp = pp;
+        this.gp = gp;
+        this.ep = ep;
+        this.sp = sp;
+        this.cp = cp;
+    }
 }

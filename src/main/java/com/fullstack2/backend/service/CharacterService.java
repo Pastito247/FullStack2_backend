@@ -231,6 +231,7 @@ public class CharacterService {
         // ==========================
         // Inventario: agregar item
         // ==========================
+        // Inventario: agregar item
         @Transactional
         public CharacterResponse addItemToInventory(Long characterId, Long itemId, int quantity) {
                 if (quantity <= 0) {
@@ -274,7 +275,6 @@ public class CharacterService {
 
                 characterItemRepository.save(characterItem);
 
-                // recargar personaje con inventario actualizado
                 CharacterEntity updated = characterRepository.findById(characterId)
                                 .orElseThrow(() -> new ResponseStatusException(
                                                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -286,6 +286,7 @@ public class CharacterService {
         // ==========================
         // Inventario: quitar item
         // ==========================
+        // Inventario: quitar item
         @Transactional
         public CharacterResponse removeItemFromInventory(Long characterId, Long itemId, int quantity) {
                 if (quantity <= 0) {
@@ -392,8 +393,9 @@ public class CharacterService {
         public List<CharacterResponse> getMyCharacters() {
                 User current = getCurrentUser();
 
-                return characterRepository.findByPlayer(current).stream()
+                return characterRepository.findAllByPlayer(current).stream()
                                 .map(this::toDto)
                                 .toList();
         }
+
 }

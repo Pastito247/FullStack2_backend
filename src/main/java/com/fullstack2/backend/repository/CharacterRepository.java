@@ -12,9 +12,11 @@ public interface CharacterRepository extends JpaRepository<CharacterEntity, Long
 
     List<CharacterEntity> findByCampaign(Campaign campaign);
 
+    // Un solo personaje para un player (si usas 1 PJ por jugador)
     Optional<CharacterEntity> findByPlayer(User player);
 
-    List<CharacterEntity> findByPlayerUsername(String username);
+    // Varios personajes para un player
+    List<CharacterEntity> findAllByPlayer(User player);
 
-    
+    List<CharacterEntity> findByPlayerUsername(String username);
 }

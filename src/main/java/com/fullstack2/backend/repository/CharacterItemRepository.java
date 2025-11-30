@@ -10,7 +10,11 @@ import java.util.Optional;
 
 public interface CharacterItemRepository extends JpaRepository<CharacterItem, Long> {
 
-    List<CharacterItem> findByCharacter(CharacterEntity character);
+    // Para ShopService (comprar/vender por IDs)
+    Optional<CharacterItem> findByCharacterIdAndItemId(Long characterId, Long itemId);
 
+    List<CharacterItem> findByCharacterId(Long characterId);
+
+    // Para CharacterService y ShopTransactionService (usa las entidades)
     Optional<CharacterItem> findByCharacterAndItem(CharacterEntity character, Item item);
 }

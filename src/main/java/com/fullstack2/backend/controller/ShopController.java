@@ -108,4 +108,32 @@ public class ShopController {
         shopService.deleteShopItem(shopItemId);
         return ResponseEntity.noContent().build();
     }
+
+    // ==========================
+    // COMPRAR / VENDER ÍTEMS
+    // ==========================
+
+    // Comprar ítem de una tienda
+    @PostMapping("/shop-items/{shopItemId}/buy")
+    @PreAuthorize("hasAnyRole('PLAYER','DM','ADMIN')")
+    public ResponseEntity<ShopItemResponse> buyItem(
+            @PathVariable Long shopItemId,
+            @RequestParam Long characterId,
+            @RequestParam(defaultValue = "1") int quantity
+    ) {
+        ShopItemResponse resp = shopService.buyItem(shopItemId, characterId, quantity);
+        return ResponseEntity.ok(resp);
+    }
+
+    // Vender ítem a la tienda
+    @PostMapping("/shop-items/{shopItemId}/sell")
+    @PreAuthorize("hasAnyRole('PLAYER','DM','ADMIN')")
+    public ResponseEntity<ShopItemResponse> sellItem(
+            @PathVariable Long shopItemId,
+            @RequestParam Long characterId,
+            @RequestParam(defaultValue = "1") int quantity
+    ) {
+        ShopItemResponse resp = shopService.sellItem(shopItemId, characterId, quantity);
+        return ResponseEntity.ok(resp);
+    }
 }
