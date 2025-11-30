@@ -29,7 +29,9 @@ public class ShopItem {
     @Column(nullable = false)
     private Integer stock;
 
-    // Si quieres sobrescribir el precio base del ítem en esta tienda
-    @Column(name = "price_override_gold")
-    private Integer priceOverrideGold;
+    // Precio override en esta tienda (en oro).
+    // IMPORTANTE: nunca debe ser null por el NOT NULL de la BD.
+    @Builder.Default
+    @Column(name = "price_override_gold", nullable = false)
+    private Integer priceOverrideGold = 0;
 }

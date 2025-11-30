@@ -4,11 +4,7 @@ import com.fullstack2.backend.dto.ShopCreateRequest;
 import com.fullstack2.backend.dto.ShopItemRequest;
 import com.fullstack2.backend.dto.ShopItemResponse;
 import com.fullstack2.backend.dto.ShopResponse;
-import com.fullstack2.backend.entity.Campaign;
-import com.fullstack2.backend.entity.Item;
-import com.fullstack2.backend.entity.Shop;
-import com.fullstack2.backend.entity.ShopItem;
-import com.fullstack2.backend.entity.User;
+import com.fullstack2.backend.entity.*;
 import com.fullstack2.backend.repository.CampaignRepository;
 import com.fullstack2.backend.repository.ItemRepository;
 import com.fullstack2.backend.repository.ShopItemRepository;
@@ -58,21 +54,41 @@ public class ShopService {
                 .imageUrl(s.getImageUrl())
                 .campaignId(s.getCampaign() != null ? s.getCampaign().getId() : null)
                 .campaignName(s.getCampaign() != null ? s.getCampaign().getName() : null)
+                .dmUsername(
+                        s.getCampaign() != null && s.getCampaign().getDm() != null
+                                ? s.getCampaign().getDm().getUsername()
+                                : null
+                )
                 .build();
     }
 
     private ShopItemResponse toShopItemDto(ShopItem si) {
         Item item = si.getItem();
 
+        Integer basePrice = item.getBasePriceGold();
+        if (basePrice == null) {
+            basePrice = 0;
+        }
+
+        Integer override = si.getPriceOverrideGold();
+        if (override == null) {
+            override = 0;
+        }
+
+        // Precio final que verá el jugador (override si es >0, sino base)
+        Integer finalPrice = (override != null && override > 0) ? override : basePrice;
+
         return ShopItemResponse.builder()
-                .id(si.getId())
-                .itemId(item.getId())
-                .itemName(item.getName())
-                .itemCategory(item.getCategory())
-                .itemRarity(item.getRarity())
-                .basePriceGold(item.getBasePriceGold())
+                .id(si.getId())                       // id del ShopItem
+                .itemId(item.getId())                 // id del Item
+                .name(item.getName())                 // nombre del Item
+                .category(item.getCategory())         // categoría del Item
+                .source(item.getSource() != null ? item.getSource().name() : null)
+                .rarity(item.getRarity())
+                .basePriceGold(basePrice)
+                .priceOverrideGold(override)
+                .finalPriceGold(finalPrice)
                 .stock(si.getStock())
-                .priceOverrideGold(si.getPriceOverrideGold())
                 .build();
     }
 
@@ -159,7 +175,6 @@ public class ShopService {
 
     @Transactional(readOnly = true)
     public List<ShopItemResponse> getItemsByShop(Long shopId) {
-        // No hace falta ser DM, basta estar autenticado (el controller controlará roles)
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tienda no encontrada"));
 
@@ -182,13 +197,21 @@ public class ShopService {
         Item item = itemRepository.findById(req.getItemId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
 
-        Integer stock = req.getStock() != null ? req.getStock() : 0;
+        Integer stock = (req.getStock() != null) ? req.getStock() : 0;
+
+        Integer priceOverrideGold = req.getPriceOverrideGold();
+        if (priceOverrideGold == null) {
+            priceOverrideGold = item.getBasePriceGold();
+        }
+        if (priceOverrideGold == null) {
+            priceOverrideGold = 0;
+        }
 
         ShopItem si = ShopItem.builder()
                 .shop(shop)
                 .item(item)
                 .stock(stock)
-                .priceOverrideGold(req.getPriceOverrideGold())
+                .priceOverrideGold(priceOverrideGold)
                 .build();
 
         ShopItem saved = shopItemRepository.save(si);
