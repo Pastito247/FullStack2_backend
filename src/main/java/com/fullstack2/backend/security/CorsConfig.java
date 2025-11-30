@@ -17,7 +17,7 @@ public class CorsConfig {
 
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://fullstack2-frontend.onrender.com" // cambia esto si tu front tiene otro dominio
+                "https://forjayacero.netlify.app" // cambia esto si tu front tiene otro dominio
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
